@@ -1,0 +1,14 @@
+[Unit]
+Description=Pathfinder camp Telegram bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/camp-bot
+EnvironmentFile=/opt/camp-bot/.env
+ExecStart=/opt/camp-bot/.venv/bin/python -m bot.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

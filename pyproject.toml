@@ -1,0 +1,10 @@
+[project]
+name = "pathfinder-camp-bot"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["aiogram==3.30.0", "SQLAlchemy==2.0.51", "aiosqlite==0.22.1", "APScheduler==3.11.3", "python-dotenv==1.2.2", "tzdata==2026.3"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
