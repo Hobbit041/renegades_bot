@@ -142,7 +142,7 @@ def who_text(state):
     if resting:
         lines.append("💤 Отдыхают: " + ", ".join(resting))
     heading = "⚒️ Кто чем сейчас занят (в % своего времени)\n" + DIVIDER + "\n"
-    text = styled(heading + ("\n".join(lines) or "Пока нет жителей."))
+    text = styled(heading) + RichText("\n".join(lines) or "Пока нет жителей.")
     offset = len(heading.encode("utf-16-le")) // 2
     for line in lines:
         icon, label = line.split(": ", 1)[0].split(" ", 1)

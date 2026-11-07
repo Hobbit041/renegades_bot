@@ -11,6 +11,23 @@ def test_utf16_chunking():
     assert all(len(x.encode("utf-16-le")) // 2 <= 3600 for x in parts)
 
 
+def test_who_bold_entities_are_ordered_and_only_cover_activity_labels(state):
+    from bot.presentation import who_text
+    from conftest import add_worker
+    for action in ("hunt", "cook", "components", "materials", "morale", "hide", "gold"):
+        add_worker(state, action)
+    resting = add_worker(state, "hunt")
+    state["characters"][resting]["actions"] = {}
+    report = who_text(state)
+    assert report.entities == sorted(report.entities, key=lambda e: e.offset)
+    raw = report.encode("utf-16-le")
+    for previous, current in zip(report.entities, report.entities[1:]):
+        assert previous.offset + previous.length <= current.offset
+    bold = [raw[e.offset*2:(e.offset+e.length)*2].decode("utf-16-le") for e in report.entities]
+    assert bold[1:] == ["Охотятся", "Готовят", "Собирают компоненты", "Собирают материалы",
+                        "Повышают мораль", "Снижают заметность лагеря", "Зарабатывают деньги", "Отдыхают"]
+
+
 def test_undo_only_before_next_camp_change(state, rules):
     active_check(state, "one", "components", -3, "Ремесло", rules)
     undo_active_check(state)
