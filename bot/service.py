@@ -6,10 +6,8 @@ import json
 import random
 import time
 
-from aiogram.types import MessageEntity
-
 from bot.domain import ACTIONS, advance, allocations, finite, ident
-from bot.presentation import DIVIDER, RichText, camp_change_text, session_text
+from bot.presentation import ACTION_ICONS, DIVIDER, camp_change_text, session_text
 
 
 def enqueue(state, target, text, key=None, markup=None, event_id=None):
@@ -49,7 +47,7 @@ def set_action(state, uid, action, debounce, cid=None, master=False):
     state["revision"] += 1
     # Masters editing NPCs do not impersonate a player's announcement.
     if c["owner"] is not None:
-        user(state, c["owner"])["announce_due"] = time.time() + debounce
+        c["announce_due"] = time.time() + debounce
     return c
 
 
@@ -70,23 +68,26 @@ def create_character(state, uid, name, masters, imported=None):
 
 
 def due_announcements(state, now):
-    for uid, u in state["users"].items():
-        if u["announce_due"] is None or u["announce_due"] > now:
-            continue
+    # Preserve pending announcements saved by versions with one timer per user.
+    for u in state["users"].values():
+        c = state["characters"].get(u.get("character"))
+        if c and u.get("announce_due") is not None:
+            c.setdefault("announce_due", u["announce_due"])
         u["announce_due"] = None
-        cid = u.get("character")
-        c = state["characters"].get(cid)
-        chosen = sorted(allocations(c)) if c and c["approved"] else []
-        # Shares alone, including changes during a debounce window, never post.
-        signature = [cid, chosen] if chosen else []
-        if signature == u["announced"]:
+    for c in state["characters"].values():
+        if c["owner"] is None:
             continue
-        u["announced"] = signature
-        who = ", ".join(ACTIONS[k] for k in chosen) or "Отдых"
-        hint = "Команда /who покажет деятельность других жителей."
-        footer = RichText(hint, [MessageEntity(type="italic", offset=0, length=len(hint))])
-        enqueue(state, "camp", f"⚒️ {u['name']} займётся следующими делами в лагере:\n{who}\n\n"
-                f"{DIVIDER}\n" + footer)
+        u = user(state, c["owner"])
+        due = c.get("announce_due")
+        if due is None or due > now:
+            continue
+        c["announce_due"] = None
+        chosen = sorted(allocations(c)) if c["approved"] else []
+        if chosen == c.get("announced", []):
+            continue
+        c["announced"] = chosen
+        who = "\n".join(f"- {ACTION_ICONS[k]} {ACTIONS[k]}" for k in chosen) or "- 💤 Отдых"
+        enqueue(state, "camp", f"⚒️ {u['name']} ({c['name']}) займётся следующими делами в лагере:\n{who}")
 
 
 def start_session(state, uid, operation, days, rules):

@@ -8,10 +8,10 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Message, ReplyKeyboardMarkup
 
 from bot.config import load_json
-from bot.domain import ACTIONS, POLICIES, RANKS, RESOURCES, allocations, finite, ident, validate_rules
+from bot.domain import ACTIONS, POLICIES, RANKS, RESOURCES, active_characters, allocations, finite, ident, validate_rules
 from bot.foundry import parse_actor
 from bot.events import SKILLS, resolve_event
-from bot.presentation import RichText, action_text, balances, camp_text, character_text, import_feedback, jobs_text, n, rich_chunks, session_text, split_text, stats_text, styled, who_text
+from bot.presentation import RichText, action_text, balances, camp_change_text, camp_text, character_text, import_feedback, jobs_text, n, rich_chunks, session_text, split_text, stats_text, styled, who_text
 from bot.service import active_check, create_character, enqueue, owned, publish_active_check, set_action, start_session, undo_active_check, user
 
 
@@ -184,7 +184,6 @@ def make_router(app):
                     c = owned(state, uid, data.split(":")[1])
                     u = user(state, uid)
                     u["character"] = c["id"]
-                    u["announce_due"] = time.time() + app.config.debounce
                     state["revision"] += 1
                 await player_screen(message, uid, "character", True)
             elif data.startswith("act:"):
@@ -388,13 +387,14 @@ def make_router(app):
                         state["events"][-1]["camp_after"] = dict(camp)
                         publish_active_check(state, row)
                     user(state, uid)["dialog"] = None
-            await message.answer("✅ Проверка записана. Баланс изменён сразу; отчёт поставлен в очередь темы лагеря."
-                                 "\n\n🏕️ Состояние лагеря сейчас\n\n" + balances(state["camp"]))
+            row = state["operations"][operation]
+            await send_long(message, camp_change_text(row["text"], row["camp_before"], row["camp_after"]))
         elif data == "undo_check":
             async with app.store.transaction() as state:
+                before = dict(state["camp"])
                 undo_active_check(state)
-            await message.answer("↩️ Последняя активная проверка отменена. Отчёт поставлен в очередь темы лагеря."
-                                 "\n\n🏕️ Состояние лагеря сейчас\n\n" + balances(state["camp"]))
+            await send_long(message, camp_change_text("Последняя активная проверка отменена.", before,
+                            state["camp"], title="↩️ Отмена активной проверки"))
         elif data == "buildings":
             state = await app.store.snapshot()
             text = "Постройки:\n" + ("\n".join(f"{b['name']}: содержание {b['upkeep']} / неделю" for b in state["camp"]["buildings"]) or "Пока нет")
@@ -531,7 +531,7 @@ def make_router(app):
                             raise ValueError("Укажите от 1 до 365 дней")
                         operation = ident()
                         u["dialog"] = {"kind": "session_confirm", "days": days, "operation": operation, "revision": state["revision"]}
-                        roster = "\n".join(f"{c['name']}: {jobs_text(c)}" for c in state["characters"].values() if c["npc"] or any(x["character"] == c["id"] for x in state["users"].values()))
+                        roster = "\n".join(f"{c['name']}: {jobs_text(c)}" for c in active_characters(state))
                         reply = f"Рассчитать {days} игровых дней и начать сессию?\n\n{roster}\n\nНазначения фиксируются при подтверждении."
                         markup = inline([("Начать сессию", "run:" + operation)], [("Отмена", "home")])
                     elif kind == "population":

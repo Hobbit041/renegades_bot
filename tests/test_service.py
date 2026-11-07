@@ -39,6 +39,27 @@ def test_session_idempotency_and_immediate_action_selection(state, rules):
     assert state["sessions"] == after["sessions"]
 
 
+def test_two_characters_keep_work_and_announcements_after_switch(state, rules):
+    first = add_worker(state, "hunt", owner=10)
+    second = add_worker(state, "gold", owner=10)
+    set_action(state, 10, "hunt", 300, cid=first)
+    set_action(state, 10, "gold", 300, cid=second)
+    from bot.domain import workforce
+    from bot.presentation import who_text
+    _, individual, _ = workforce(state, rules)
+    assert first in individual and second in individual
+    due_announcements(state, time.time()+301)
+    assert len(state["outbox"]) == 2
+    assert first in state["outbox"][0]["text"]
+    assert second in state["outbox"][1]["text"]
+    assert "/who" not in state["outbox"][0]["text"]
+    assert "- 🏹 Охота" in state["outbox"][0]["text"]
+    assert f"Охотятся: {first} (100%)" in who_text(state)
+    user(state, 10)["character"] = first
+    set_action(state, 10, "reset", 300)
+    assert allocations(state["characters"][second]) == {"gold": 1}
+
+
 def test_ownership_and_insufficient_resources(state):
     cid = add_worker(state, "hunt", owner=10)
     with pytest.raises(ValueError):

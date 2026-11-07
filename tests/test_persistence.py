@@ -15,10 +15,13 @@ async def test_restart_preserves_deadlines_and_subscription(tmp_path, rules):
     async with store.transaction() as state:
         cid = add_worker(state, "hunt", owner=10)
         user(state, 10).update(events=True, announce_due=time.time()-1)
+        state["camp"].update(day=4, gold=1530, food=72)
     await store.close()
     store = Store(path)
     await store.init(rules)
     async with store.transaction() as state:
+        assert state["characters"][cid]["actions"] == {"hunt": 1}
+        assert (state["camp"]["day"], state["camp"]["gold"], state["camp"]["food"]) == (4, 1530, 72)
         due_announcements(state, time.time())
         assert user(state, 10)["events"]
         assert len(state["outbox"]) == 1

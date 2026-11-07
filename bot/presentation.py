@@ -74,12 +74,11 @@ def event_result_text(title, character, choice, outcome, story, changes, check=N
             continue
         suffix = " п.п." if key in ("food", "morale", "visibility") else unit(key)
         sign = "+" if value > 0 else "−"
-        effects.append(f"{RESOURCE_ICONS[key]} {RESOURCES[key]}: {sign}{n(abs(value))}{suffix}")
+        current = f" ({n(camp[key])}{unit(key)})" if camp is not None else ""
+        effects.append(f"{RESOURCE_ICONS[key]} {RESOURCES[key]}: {sign}{n(abs(value))}{suffix}{current}")
     text = (f"📜 Событие лагеря: {title}\n👤 Персонаж: {character}\n🎯 Действие: {choice}\n"
             f"{badge} Результат: {label}\n{DIVIDER}\n{story}\n\n"
             "📦 Изменения в лагере\n" + ("\n".join(effects) or "Без изменения ресурсов."))
-    if camp is not None:
-        text += "\n\n🏕️ Состояние лагеря сейчас\n" + balances(camp)
     if check:
         text += f"\n\n🎲 Проверка: {check}"
     return styled(text)
@@ -87,18 +86,15 @@ def event_result_text(title, character, choice, outcome, story, changes, check=N
 
 def camp_change_text(description, before, after, title="📜 Новое событие!"):
     lines = []
-    current = []
     for key, label in RESOURCES.items():
         value = after[key] - before[key]
         if abs(value) <= 1e-9:
             continue
         sign = "+" if value > 0 else "−"
         suffix = " п.п." if key in ("food", "morale", "visibility") else unit(key)
-        lines.append(f"{RESOURCE_ICONS[key]} {label}: {sign}{n(abs(value))}{suffix}")
-        current.append(f"{RESOURCE_ICONS[key]} {label}: {n(after[key])}{unit(key)}")
-    return styled(f"{title}\n{DIVIDER}\n{description}\n\n📦 Изменения\n"
-            + ("\n".join(lines) or "Без изменения ресурсов.")
-            + ("\n\n🏕️ Состояние лагеря сейчас\n" + "\n".join(current) if current else ""))
+        lines.append(f"{RESOURCE_ICONS[key]} {label}: {sign}{n(abs(value))}{suffix} ({n(after[key])}{unit(key)})")
+    return styled(f"{title}\n{DIVIDER}\n{description}\n\n📦 Изменения в лагере\n"
+            + ("\n".join(lines) or "Без изменения ресурсов."))
 
 
 def split_text(text, limit=3600):
@@ -133,9 +129,20 @@ def jobs_text(c):
 
 def who_text(state):
     residents = sorted(active_characters(state), key=lambda c: c["name"].casefold())
-    lines = [f"👤 {c['name']}: {jobs_text(c)}" for c in residents]
-    return styled("⚒️ Кто чем сейчас занят\n" + DIVIDER + "\n"
-                  + ("\n".join(lines) or "Пока никто не выбрал занятия."))
+    labels = {"hunt": "Охотятся", "cook": "Готовят", "components": "Собирают компоненты",
+              "materials": "Собирают материалы", "morale": "Повышают мораль",
+              "hide": "Снижают заметность лагеря", "gold": "Зарабатывают деньги"}
+    lines = []
+    for action, label in labels.items():
+        workers = [f"{c['name']} ({n(allocations(c)[action]*100)}%)"
+                   for c in residents if action in allocations(c)]
+        if workers:
+            lines.append(f"{ACTION_ICONS[action]} {label}: " + ", ".join(workers))
+    resting = [c["name"] for c in residents if not allocations(c)]
+    if resting:
+        lines.append("💤 Отдыхают: " + ", ".join(resting))
+    return styled("⚒️ Кто чем сейчас занят (в % своего времени)\n" + DIVIDER + "\n"
+                  + ("\n\n".join(lines) or "Пока нет жителей."))
 
 
 def character_text(c, show_modifiers=False):

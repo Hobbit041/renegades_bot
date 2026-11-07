@@ -131,7 +131,12 @@ async def main():
     store, bot = Store(config.db_path), Bot(config.token)
     scheduler = AsyncIOScheduler(timezone=config.timezone)
     try:
+        db_path = Path(config.db_path).resolve()
+        log.info("Файл базы лагеря: %s", db_path)
         await store.init(rules)
+        state = await store.snapshot()
+        log.info("База лагеря открыта: игровой день %s, ревизия %s, персонажей %s",
+                 state["camp"]["day"], state["revision"], len(state["characters"]))
         app = Application(config, rules, store, bot)
         dp = Dispatcher()
         dp.include_router(make_router(app))

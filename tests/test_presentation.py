@@ -37,11 +37,11 @@ def test_active_resource_update_is_immediate_and_published_once(state, rules):
     active_check(state, "now", "gold", 10, "Успех вылазки", rules)
     assert len(state["outbox"]) == 1
     assert "🪙 Золото: +10 зм" in state["outbox"][0]["text"]
-    assert "🪙 Золото: 1258 зм" in state["outbox"][0]["text"]
+    assert "🪙 Золото: +10 зм (1258 зм)" in state["outbox"][0]["text"]
     undo_active_check(state)
     assert state["camp"]["gold"] == 1248
     assert len(state["outbox"]) == 2
-    assert "🪙 Золото: 1248 зм" in state["outbox"][-1]["text"]
+    assert "🪙 Золото: −10 зм (1248 зм)" in state["outbox"][-1]["text"]
 
 
 def test_player_card_and_import_feedback_never_list_imported_skills():

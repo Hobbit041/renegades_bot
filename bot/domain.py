@@ -104,9 +104,8 @@ def initial_state(rules):
 
 
 def active_characters(state):
-    selected = {u.get("character") for u in state["users"].values()}
     return [c for c in state["characters"].values()
-            if c["approved"] and (c["npc"] or c["id"] in selected)]
+            if c["approved"]]
 
 
 def allocations(character):

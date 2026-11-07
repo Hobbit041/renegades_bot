@@ -108,7 +108,8 @@ async def test_who_command_lists_current_jobs_without_changing_state(app):
     assert report.message_thread_id == app.config.thread_id
     assert "Кто чем сейчас занят" in report.text
     for c in active_characters(before):
-        assert f"{c['name']}: {jobs_text(c)}" in report.text
+        assert c["name"] in report.text
+    assert "в % своего времени" in report.text
     assert await app.store.snapshot() == before
     assert report.reply_markup is None
 
@@ -205,8 +206,8 @@ async def test_spend_and_meal_are_confirmed_once(app):
     state = await app.store.snapshot()
     reports = [o for o in state["outbox"] if o["target"] == "camp"]
     assert len(reports) == 1
-    assert "🏕️ Состояние лагеря сейчас" in reports[0]["text"]
-    assert "🧪 Компоненты: 37" in reports[0]["text"]
+    assert "📦 Изменения в лагере" in reports[0]["text"]
+    assert "🧪 Компоненты: −5 (37)" in reports[0]["text"]
     assert state["camp"]["day"] == 0
     await callback(app, 1, "meal")
     await message(app, 1, "2 1 3")
@@ -218,8 +219,8 @@ async def test_spend_and_meal_are_confirmed_once(app):
     assert state["camp"]["morale"] == 57
     reports = [o for o in state["outbox"] if o["target"] == "camp"]
     assert len(reports) == 2
-    assert "🧪 Компоненты: 33.4" in reports[-1]["text"]
-    assert "🔥 Мораль: 57%" in reports[-1]["text"]
+    assert "🧪 Компоненты: −3.6 (33.4)" in reports[-1]["text"]
+    assert "🔥 Мораль: +2 п.п. (57%)" in reports[-1]["text"]
 
 
 async def test_concurrent_delivery_does_not_send_twice(app):
@@ -261,7 +262,8 @@ async def test_personal_event_delivered_with_buttons_and_resolved_once(app):
     assert "Событие лагеря: Песня у костра" in reports[0].text
     assert "Персонаж:" in reports[0].text and "Результат:" in reports[0].text
     assert "Проверка:" not in reports[0].text
-    assert "🏕️ Состояние лагеря сейчас" in reports[0].text
+    assert "📦 Изменения в лагере" in reports[0].text
+    assert "🪙 Золото:" not in reports[0].text
 
 
 async def test_expired_event_callback_and_unsent_event_queue(app):
