@@ -4,6 +4,7 @@ import io
 import time
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Message, ReplyKeyboardMarkup
 
@@ -61,7 +62,12 @@ def make_router(app):
             entities = getattr(text, "entities", [])
             if message.text == text and (message.entities or []) == entities and message.reply_markup == markup:
                 return
-            await message.edit_text(str(text), entities=entities, parse_mode=None, reply_markup=markup)
+            try:
+                await message.edit_text(str(text), entities=entities, parse_mode=None, reply_markup=markup)
+            except TelegramBadRequest as exc:
+                # Concurrent callbacks may already have applied the same screen.
+                if "message is not modified" not in exc.message.lower():
+                    raise
         else:
             await send_long(message, text, markup)
 

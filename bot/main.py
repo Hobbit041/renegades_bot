@@ -125,6 +125,7 @@ async def main():
     load_dotenv(ROOT / ".env")
     log_dir = os.environ.get("LOG_DIR") or str(Path(os.environ.get("DATA_DIR") or ROOT) / "logs")
     configure_logging(log_dir)
+    log.info("Версия бота: 2026.11.07.2; /who сгруппирован по занятиям; исходники: %s", ROOT)
     config = Config.from_env()
     rules = load_json(os.environ.get("RULES_PATH", "config/rules.json"))
     validate_rules(rules)

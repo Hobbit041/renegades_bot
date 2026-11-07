@@ -129,6 +129,25 @@ async def test_master_gets_different_home(app):
     assert player.keyboard[0][0].text == "Персонаж"
 
 
+@pytest.mark.parametrize("error", ["message is not modified", "chat not found"])
+async def test_repeated_menu_edit_only_ignores_unchanged_message(app, monkeypatch, error):
+    from aiogram.exceptions import TelegramBadRequest
+    from aiogram.methods import EditMessageText
+    original = app.bot.session.make_request
+
+    async def request(bot, method, timeout=None):
+        if isinstance(method, EditMessageText):
+            raise TelegramBadRequest(method=method, message=error)
+        return await original(bot, method, timeout)
+
+    monkeypatch.setattr(app.bot.session, "make_request", request)
+    if error == "message is not modified":
+        await callback(app, 1, "manage")
+    else:
+        with pytest.raises(TelegramBadRequest, match=error):
+            await callback(app, 1, "manage")
+
+
 async def test_player_cannot_forge_master_buttons(app):
     before = await app.store.snapshot()
     await callback(app, 10, "life:luxury")
