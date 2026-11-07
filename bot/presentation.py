@@ -134,15 +134,23 @@ def who_text(state):
               "hide": "Снижают заметность лагеря", "gold": "Зарабатывают деньги"}
     lines = []
     for action, label in labels.items():
-        workers = [f"{c['name']} ({n(allocations(c)[action]*100)}%)"
+        workers = [f"{c['name']} ({allocations(c)[action]*100:.0f}%)"
                    for c in residents if action in allocations(c)]
         if workers:
             lines.append(f"{ACTION_ICONS[action]} {label}: " + ", ".join(workers))
     resting = [c["name"] for c in residents if not allocations(c)]
     if resting:
         lines.append("💤 Отдыхают: " + ", ".join(resting))
-    return styled("⚒️ Кто чем сейчас занят (в % своего времени)\n" + DIVIDER + "\n"
-                  + ("\n\n".join(lines) or "Пока нет жителей."))
+    heading = "⚒️ Кто чем сейчас занят (в % своего времени)\n" + DIVIDER + "\n"
+    text = styled(heading + ("\n".join(lines) or "Пока нет жителей."))
+    offset = len(heading.encode("utf-16-le")) // 2
+    for line in lines:
+        icon, label = line.split(": ", 1)[0].split(" ", 1)
+        text.entities.append(MessageEntity(type="bold",
+            offset=offset + len((icon + " ").encode("utf-16-le")) // 2,
+            length=len(label.encode("utf-16-le")) // 2))
+        offset += len((line + "\n").encode("utf-16-le")) // 2
+    return text
 
 
 def character_text(c, show_modifiers=False):
