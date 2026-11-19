@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bot.domain import ACTIONS, RESOURCES, RANKS, active_characters, allocations, expenses, morale_efficiency, production_tier
+from bot.domain import ACTIONS, RESOURCES, RANKS, active_characters, allocations, expenses, production_tier
 from aiogram.types import MessageEntity
 
 DIVIDER = "━━━━━━━━━━━━━━━"
@@ -127,23 +127,38 @@ def balances(camp, rules=None):
         if food <= 1e-9 or food < threshold:
             hints["food"] = "Голод: мораль снижается"
         elif food >= 60:
-            hints["food"] = "Пайки всегда в наличии"
+            hints["food"] = "Пайки всегда доступны"
         else:
-            hints["food"] = "Запас пайков ограничен"
+            hints["food"] = "Нет бонусов"
         tier = production_tier(camp["components"], rules)
         quantity = tier["quantity"]
         item = "предмет" if quantity == 1 else "предмета"
         hints["components"] = f"{n(tier['days'])} дней на {quantity} {item}"
-        bonus = (morale_efficiency(camp, rules) - 1) * 100
-        hints["morale"] = (f"Эффективность всех работ {'+' if bonus > 0 else '−'}{n(abs(bonus))}%"
-                           if abs(bonus) > 1e-9 else "Эффективность работ без изменений")
+        morale = camp["morale"]
+        if morale < 10:
+            hints["morale"] = "Макс. ХП снижено, макс. 1 очко героизма"
+        elif morale < 30:
+            hints["morale"] = "Макс. 1 очко героизма"
+        elif morale < 70:
+            hints["morale"] = "Нет бонусов"
+        elif morale < 90:
+            hints["morale"] = "Сон восстанавливает ×2"
+        else:
+            hints["morale"] = "+1 очко героизма"
     text = RichText("")
-    for key, name in RESOURCES.items():
+    for key in ("gold", "food", "components", "materials", "morale", "visibility"):
         if text:
             text += "\n"
-        text += styled(f"{RESOURCE_ICONS[key]} {name}: {n(camp[key])}{unit(key)}")
+        prefix = f"{RESOURCE_ICONS[key]} {RESOURCES[key]}: "
+        if rules is not None and key in ("food", "components", "morale"):
+            percent = round(max(0, min(100, camp[key])))
+            filled = percent // 10
+            bar = "█" * filled + "░" * (10-filled)
+            text += prefix + RichText(bar, [MessageEntity(type="code", offset=0, length=10)]) + f" {percent}%"
+        else:
+            text += styled(prefix + f"{n(camp[key])}{unit(key)}")
         if key in hints:
-            text += f" ({hints[key]})"
+            text += f"\n({hints[key]})"
     return text
 
 

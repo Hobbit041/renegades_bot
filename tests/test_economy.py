@@ -18,7 +18,6 @@ def test_modifier_scale_and_validation(rules):
 @pytest.mark.parametrize("resource,action,expected", [("food", "hunt", 40), ("components", "components", 32), ("materials", "materials", 200)])
 @pytest.mark.parametrize("npc", [True, False])
 def test_four_high_workers_produce_expected_stock(state, rules, resource, action, expected, npc):
-    rules["morale"].update(work_bonus=0, work_penalty=0)
     state["camp"][resource] = 0
     state["camp"]["policies"] = dict.fromkeys(("food", "components", "materials"), "none")
     for i in range(4):
@@ -36,7 +35,7 @@ def test_morale_targets(state, rules, lifestyle, days):
     advance(state, days - 1, rules, random.Random(2))
     assert state["camp"]["morale"] < 100
     advance(state, 1, rules, random.Random(3))
-    assert state["camp"]["morale"] == pytest.approx(100, abs=.02)
+    assert state["camp"]["morale"] == pytest.approx(100, abs=.0001)
 
 
 def test_lifestyle_does_not_change_morale_without_workers(state, rules):
@@ -80,8 +79,8 @@ def test_low_food_hunger_threshold(state, rules, food, hungry):
     assert (state["camp"]["morale"] < 60) == hungry
 
 
-@pytest.mark.parametrize("morale,multiplier", [(29.99,.95),(30,1),(69.99,1),(70,1.05),(100,1.05)])
-def test_morale_changes_all_passive_job_efficiencies(state, rules, morale, multiplier):
+@pytest.mark.parametrize("morale,multiplier", [(0,1),(29.99,1),(30,1),(69.99,1),(70,1),(100,1)])
+def test_morale_never_changes_passive_job_efficiencies(state, rules, morale, multiplier):
     from bot.domain import ACTIONS, workforce
     state["camp"]["morale"] = morale
     for action in ACTIONS:
@@ -91,14 +90,14 @@ def test_morale_changes_all_passive_job_efficiencies(state, rules, morale, multi
         assert rates[action] == pytest.approx(rules["yield_high"][action]*multiplier)
 
 
-def test_morale_bonus_is_recalculated_within_a_session(state, rules):
+def test_morale_changes_within_a_session_do_not_change_yields(state, rules):
     rules["weekly"]["food_person"] = 0
     state["camp"].update(morale=69, lifestyle="comfortable", gold=100000)
     for _ in range(4):
         add_worker(state, "morale")
     add_worker(state, "gold")
     result = advance(state, 2, rules)
-    assert result["collected"]["gold"] == pytest.approx(6.3/7 + 6.3*1.05/7)
+    assert result["collected"]["gold"] == pytest.approx(6.3*2/7)
 
 
 def test_chunk_invariance_and_hidden_cycles(state, rules):

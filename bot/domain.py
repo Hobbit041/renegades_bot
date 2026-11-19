@@ -83,8 +83,6 @@ def validate_rules(r):
         for key in ("cost", "morale", "visibility"):
             finite(life[key], 0, 10000)
     finite(r["morale"].get("hunger_threshold", 30), 0, 100)
-    finite(r["morale"].get("work_bonus", .05), 0, 1)
-    finite(r["morale"].get("work_penalty", .05), 0, 1)
     finite(r["morale"]["exponent"], .01, 1)
     finite(r["morale"]["comfortable_days"], 1, 365)
     finite(r["morale"]["luxury_days"], 1, 365)
@@ -136,26 +134,17 @@ def allocations(character):
     return {k: v / total * character.get("time_budget", 1) for k, v in actions.items()} if total else {}
 
 
-def morale_efficiency(camp, rules):
-    if camp["morale"] >= 70:
-        return 1 + rules["morale"].get("work_bonus", .05)
-    if camp["morale"] < 30:
-        return 1 - rules["morale"].get("work_penalty", .05)
-    return 1
-
-
 def workforce(state, rules):
     rates = dict.fromkeys(ACTIONS, 0.0)
     contributions = {}
     noisy = 0
-    morale_factor = morale_efficiency(state["camp"], rules)
     for c in active_characters(state):
         values = {}
         for action, share in allocations(c).items():
             mod = c["skills"][action].get("modifier")
             if mod is None:
                 continue
-            amount = rules["yield_high"][action] * efficiency(mod, rules) * share * morale_factor
+            amount = rules["yield_high"][action] * efficiency(mod, rules) * share
             rates[action] += amount
             values[action] = amount
             if action != "morale":
