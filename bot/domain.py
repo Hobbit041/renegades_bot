@@ -82,6 +82,9 @@ def validate_rules(r):
     for life in r["lifestyles"].values():
         for key in ("cost", "morale", "visibility"):
             finite(life[key], 0, 10000)
+    finite(r["morale"].get("hunger_threshold", 30), 0, 100)
+    finite(r["morale"].get("work_bonus", .05), 0, 1)
+    finite(r["morale"].get("work_penalty", .05), 0, 1)
     finite(r["morale"]["exponent"], .01, 1)
     finite(r["morale"]["comfortable_days"], 1, 365)
     finite(r["morale"]["luxury_days"], 1, 365)
@@ -133,17 +136,26 @@ def allocations(character):
     return {k: v / total * character.get("time_budget", 1) for k, v in actions.items()} if total else {}
 
 
+def morale_efficiency(camp, rules):
+    if camp["morale"] >= 70:
+        return 1 + rules["morale"].get("work_bonus", .05)
+    if camp["morale"] < 30:
+        return 1 - rules["morale"].get("work_penalty", .05)
+    return 1
+
+
 def workforce(state, rules):
     rates = dict.fromkeys(ACTIONS, 0.0)
     contributions = {}
     noisy = 0
+    morale_factor = morale_efficiency(state["camp"], rules)
     for c in active_characters(state):
         values = {}
         for action, share in allocations(c).items():
             mod = c["skills"][action].get("modifier")
             if mod is None:
                 continue
-            amount = rules["yield_high"][action] * efficiency(mod, rules) * share
+            amount = rules["yield_high"][action] * efficiency(mod, rules) * share * morale_factor
             rates[action] += amount
             values[action] = amount
             if action != "morale":
@@ -187,7 +199,6 @@ def advance(state, days, rules, rng=None):
         raise ValueError("Укажите от 1 до 365 игровых дней")
     rng = rng or random.Random()
     camp = state["camp"]
-    rates, individual, noisy = workforce(state, rules)
     cost = expenses(camp, rules)
     before = {k: camp[k] for k in RESOURCES}
     collected = dict.fromkeys(("gold", "food", "components", "materials"), 0.0)
@@ -195,6 +206,7 @@ def advance(state, days, rules, rng=None):
     camp.setdefault("production_progress", 0)
     camp.pop("cycle_due", None)
     for _ in range(days):
+        rates, individual, noisy = workforce(state, rules)
         camp["day"] += 1
         earned = rates["gold"] / 7
         camp["gold"] += earned
@@ -217,7 +229,7 @@ def advance(state, days, rules, rng=None):
         factor = mr["comfortable_days"] / mr["luxury_days"] if camp["lifestyle"] == "luxury" else life["morale"]
         pace = ((700 / mr["comfortable_days"] * factor + decay) * (rates["morale"] / 4) ** mr["exponent"]
                 if rates["morale"] else 0) - decay - mr["unpaid_penalty"] * unpaid
-        if camp["food"] <= 1e-9:
+        if camp["food"] <= 1e-9 or camp["food"] < mr.get("hunger_threshold", 30):
             pace = -max(mr["hunger_penalty"], abs(pace))
         asym = 100 * mr["curve"]
         z = -100 * math.log(1 - previous / asym) / math.log(asym / (asym - 100))

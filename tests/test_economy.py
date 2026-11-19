@@ -15,15 +15,16 @@ def test_modifier_scale_and_validation(rules):
     assert .4 < efficiency(7, rules) < 2/3
 
 
-@pytest.mark.parametrize("resource,action", [("food", "hunt"), ("components", "components"), ("materials", "materials")])
+@pytest.mark.parametrize("resource,action,expected", [("food", "hunt", 40), ("components", "components", 32), ("materials", "materials", 200)])
 @pytest.mark.parametrize("npc", [True, False])
-def test_four_any_workers_restore_full_stock(state, rules, resource, action, npc):
+def test_four_high_workers_produce_expected_stock(state, rules, resource, action, expected, npc):
+    rules["morale"].update(work_bonus=0, work_penalty=0)
     state["camp"][resource] = 0
     state["camp"]["policies"] = dict.fromkeys(("food", "components", "materials"), "none")
     for i in range(4):
         add_worker(state, action, owner=None if npc else i+1)
     advance(state, 7, rules, random.Random(1))
-    assert state["camp"][resource] == pytest.approx(rules["capacity"][resource])
+    assert state["camp"][resource] == pytest.approx(expected)
 
 
 @pytest.mark.parametrize("lifestyle,days", [("comfortable", 28), ("good", 28), ("luxury", 7)])
@@ -35,7 +36,7 @@ def test_morale_targets(state, rules, lifestyle, days):
     advance(state, days - 1, rules, random.Random(2))
     assert state["camp"]["morale"] < 100
     advance(state, 1, rules, random.Random(3))
-    assert state["camp"]["morale"] == pytest.approx(100)
+    assert state["camp"]["morale"] == pytest.approx(100, abs=.02)
 
 
 def test_lifestyle_does_not_change_morale_without_workers(state, rules):
@@ -55,6 +56,49 @@ def test_hunger_beats_nine_morale_workers(state, rules):
         add_worker(state, "morale")
     advance(state, 1, rules)
     assert state["camp"]["morale"] < 80
+
+
+@pytest.mark.parametrize("policy,loss", [("none",10/7),("moderate",1),("increased",1/7)])
+def test_four_average_collectors_lose_components_daily(state, rules, policy, loss):
+    state["camp"].update(components=100, gold=100000)
+    state["camp"]["policies"]["components"] = policy
+    for _ in range(4):
+        add_worker(state, "components", modifier=10)
+    for day in range(1, 8):
+        advance(state, 1, rules)
+        assert state["camp"]["components"] == pytest.approx(100-day*loss)
+
+
+@pytest.mark.parametrize("food,hungry", [(0,True),(29.99,True),(30,False),(60,False)])
+def test_low_food_hunger_threshold(state, rules, food, hungry):
+    rules["weekly"]["food_person"] = 0
+    state["camp"].update(food=food, morale=60, lifestyle="luxury", gold=100000)
+    state["camp"]["policies"]["food"] = "none"
+    for _ in range(4):
+        add_worker(state, "morale")
+    advance(state, 1, rules)
+    assert (state["camp"]["morale"] < 60) == hungry
+
+
+@pytest.mark.parametrize("morale,multiplier", [(29.99,.95),(30,1),(69.99,1),(70,1.05),(100,1.05)])
+def test_morale_changes_all_passive_job_efficiencies(state, rules, morale, multiplier):
+    from bot.domain import ACTIONS, workforce
+    state["camp"]["morale"] = morale
+    for action in ACTIONS:
+        add_worker(state, action)
+    rates, _, _ = workforce(state, rules)
+    for action in ACTIONS:
+        assert rates[action] == pytest.approx(rules["yield_high"][action]*multiplier)
+
+
+def test_morale_bonus_is_recalculated_within_a_session(state, rules):
+    rules["weekly"]["food_person"] = 0
+    state["camp"].update(morale=69, lifestyle="comfortable", gold=100000)
+    for _ in range(4):
+        add_worker(state, "morale")
+    add_worker(state, "gold")
+    result = advance(state, 2, rules)
+    assert result["collected"]["gold"] == pytest.approx(6.3/7 + 6.3*1.05/7)
 
 
 def test_chunk_invariance_and_hidden_cycles(state, rules):

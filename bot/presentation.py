@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bot.domain import ACTIONS, RESOURCES, RANKS, active_characters, allocations, expenses
+from bot.domain import ACTIONS, RESOURCES, RANKS, active_characters, allocations, expenses, morale_efficiency, production_tier
 from aiogram.types import MessageEntity
 
 DIVIDER = "━━━━━━━━━━━━━━━"
@@ -112,15 +112,39 @@ def split_text(text, limit=3600):
 
 
 def unit(resource):
-    return "%" if resource in ("food", "morale", "visibility") else " зм" if resource == "gold" else ""
+    return " зм" if resource == "gold" else " ед." if resource == "materials" else "%"
 
 
 def n(value):
     return f"{value:.2f}".rstrip("0").rstrip(".")
 
 
-def balances(camp):
-    return styled("\n".join(f"{RESOURCE_ICONS[key]} {name}: {n(camp[key])}{unit(key)}" for key, name in RESOURCES.items()))
+def balances(camp, rules=None):
+    hints = {}
+    if rules is not None:
+        food = camp["food"]
+        threshold = rules["morale"].get("hunger_threshold", 30)
+        if food <= 1e-9 or food < threshold:
+            hints["food"] = "Голод: мораль снижается"
+        elif food >= 60:
+            hints["food"] = "Пайки всегда в наличии"
+        else:
+            hints["food"] = "Запас пайков ограничен"
+        tier = production_tier(camp["components"], rules)
+        quantity = tier["quantity"]
+        item = "предмет" if quantity == 1 else "предмета"
+        hints["components"] = f"{n(tier['days'])} дней на {quantity} {item}"
+        bonus = (morale_efficiency(camp, rules) - 1) * 100
+        hints["morale"] = (f"Эффективность всех работ {'+' if bonus > 0 else '−'}{n(abs(bonus))}%"
+                           if abs(bonus) > 1e-9 else "Эффективность работ без изменений")
+    text = RichText("")
+    for key, name in RESOURCES.items():
+        if text:
+            text += "\n"
+        text += styled(f"{RESOURCE_ICONS[key]} {name}: {n(camp[key])}{unit(key)}")
+        if key in hints:
+            text += f" ({hints[key]})"
+    return text
 
 
 def jobs_text(c):
@@ -173,13 +197,13 @@ def action_text(c):
 def camp_text(state, rules):
     c = state["camp"]
     daily = expenses(c, rules)
-    costs = "\n".join(f"{RESOURCE_ICONS[k]} {RESOURCES[k]}: {n(v/7)}{'%' if k == 'food' else ' зм' if k == 'gold' else ''}" for k, v in daily.items())
-    return styled(f"🏕️ Лагерь\n📍 Расположение: {c['location']}\n👥 Жителей: {c['residents']}\n"
+    costs = "\n".join(f"{RESOURCE_ICONS[k]} {RESOURCES[k]}: {n(v/7)}{unit(k)}" for k, v in daily.items())
+    header = styled(f"🏕️ Лагерь\n📍 Расположение: {c['location']}\n👥 Жителей: {c['residents']}\n"
             f"Одобренных персонажей: {len(active_characters(state))}\n"
             f"Безымянных жителей: {c.get('extra_residents', max(0, c['residents']-len(active_characters(state))))}\n"
             f"🐎 Лошадей: {c['horses']}\n📅 Игровой день: {c['day']}\n"
-            f"🛏️ Уровень жизни: {rules['lifestyles'][c['lifestyle']]['label']}\n{DIVIDER}\n📦 Запасы и состояние\n"
-            + balances(c) + f"\n\n📉 Суточный расход\n{costs}"
+            f"🛏️ Уровень жизни: {rules['lifestyles'][c['lifestyle']]['label']}\n{DIVIDER}\n📦 Запасы и состояние\n")
+    return header + balances(c, rules) + styled(f"\n\n📉 Суточный расход\n{costs}"
             + f"\n\n👁️ Неснижаемая заметность: {min(100, c['residents'])}%")
 
 

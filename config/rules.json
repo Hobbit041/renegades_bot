@@ -1,10 +1,10 @@
 {
-  "source": "Google Sheets, согласованный баланс 04.11.2026; предложения с листа сравнения НЕ применены",
+  "source": "Баланс 20.11.2026: провиант 8%, компоненты 94% на 20 жителей в неделю, поправка эффективности по морали",
   "residents": 20,
   "horses": 2,
   "initial": {"gold": 1248, "food": 100, "components": 42, "materials": 30, "morale": 55, "visibility": 20},
   "capacity": {"food": 100, "components": 100, "materials": 200},
-  "weekly": {"living_person": 2, "horse": 0.4, "food_person": 5, "components": 26, "materials": 23, "morale_decay": 5},
+  "weekly": {"living_person": 2, "horse": 0.4, "food_person": 8, "components": 94, "materials": 23, "morale_decay": 5},
   "yield_high": {"hunt": 50, "cook": 50, "components": 31.5, "materials": 55.75, "morale": 1, "hide": 4, "gold": 6.3},
   "modifier_scale": [[0, 0], [5, 0.4], [10, 0.6666666666666666], [15, 1]],
   "action_skills": {"hunt": ["survival"], "cook": ["crafting"], "components": ["crafting"], "materials": ["crafting"], "morale": ["performance", "diplomacy"], "hide": ["stealth"], "gold": ["society"]},
@@ -17,7 +17,7 @@
     "good": {"label": "Хороший", "cost": 10, "morale": 1, "visibility": 10},
     "luxury": {"label": "Роскошный", "cost": 20, "morale": 4, "visibility": 20}
   },
-  "morale": {"exponent": 0.5, "curve": 1.5, "hunger_penalty": 20, "unpaid_penalty": 5, "comfortable_days": 28, "luxury_days": 7},
+  "morale": {"exponent": 0.5, "curve": 1.5, "hunger_penalty": 20, "hunger_threshold": 30, "work_bonus": 0.05, "work_penalty": 0.05, "unpaid_penalty": 5, "comfortable_days": 28, "luxury_days": 7},
   "noise_per_worker": 0.5,
   "building_upkeep_default": 0,
   "ingredient_basic": 0.1,

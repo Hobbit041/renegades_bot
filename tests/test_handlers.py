@@ -226,7 +226,7 @@ async def test_spend_and_meal_are_confirmed_once(app):
     reports = [o for o in state["outbox"] if o["target"] == "camp"]
     assert len(reports) == 1
     assert "📦 Изменения в лагере" in reports[0]["text"]
-    assert "🧪 Компоненты: −5 (37)" in reports[0]["text"]
+    assert "🧪 Компоненты: −5% (37%)" in reports[0]["text"]
     assert state["camp"]["day"] == 0
     await callback(app, 1, "meal")
     await message(app, 1, "2 1 3")
@@ -238,7 +238,7 @@ async def test_spend_and_meal_are_confirmed_once(app):
     assert state["camp"]["morale"] == 57
     reports = [o for o in state["outbox"] if o["target"] == "camp"]
     assert len(reports) == 2
-    assert "🧪 Компоненты: −3.6 (33.4)" in reports[-1]["text"]
+    assert "🧪 Компоненты: −3.6% (33.4%)" in reports[-1]["text"]
     assert "🔥 Мораль: +2% (57%)" in reports[-1]["text"]
 
 

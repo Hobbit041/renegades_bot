@@ -11,6 +11,30 @@ def test_utf16_chunking():
     assert all(len(x.encode("utf-16-le")) // 2 <= 3600 for x in parts)
 
 
+@pytest.mark.parametrize("food,label", [(29,"Голод: мораль снижается"),(30,"Запас пайков ограничен"),(60,"Пайки всегда в наличии")])
+def test_camp_resource_explanations_are_outside_bold(state, rules, food, label):
+    from bot.presentation import camp_text
+    state["camp"].update(food=food, components=100)
+    text = camp_text(state, rules)
+    assert label in text
+    assert "Компоненты: 100% (7 дней на 2 предмета)" in text
+    assert "Материалы: 30 ед." in text
+    raw = text.encode("utf-16-le")
+    bold = [raw[e.offset*2:(e.offset+e.length)*2].decode("utf-16-le") for e in text.entities]
+    assert "100%" in bold
+    assert all(label not in value and "дней на" not in value for value in bold)
+    assert text.entities == sorted(text.entities, key=lambda e:e.offset)
+
+
+@pytest.mark.parametrize("morale,hint", [(29,"Эффективность всех работ −5%"),(50,"Эффективность работ без изменений"),(70,"Эффективность всех работ +5%")])
+def test_camp_shows_actual_morale_work_effect(state, rules, morale, hint):
+    from bot.presentation import camp_text
+    state["camp"]["morale"] = morale
+    text = camp_text(state, rules)
+    assert hint in text
+    assert "п.п." not in text
+
+
 def test_who_bold_entities_are_ordered_and_only_cover_activity_labels(state):
     from bot.presentation import who_text
     from conftest import add_worker
