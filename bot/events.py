@@ -105,7 +105,7 @@ def offer_text(entry):
              DIVIDER, event["text"], "", "🎯 Доступные действия"]
     for choice in event["choices"]:
         names = " или ".join(SKILLS.get(k, k) for k in choice["skills"])
-        difficulty = " · ⚠️ сложная, −15 п.п." if choice.get("penalty") == .15 else ""
+        difficulty = " · ⚠️ сложная, −15%" if choice.get("penalty") == .15 else ""
         lines.append(f"• {choice['label']} — {names}{difficulty}")
     lines.append("\n⏳ Событие действует 24 часа.\n🚶 Пройти мимо можно без последствий.")
     return styled("\n".join(lines))

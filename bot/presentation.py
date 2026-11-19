@@ -72,7 +72,7 @@ def event_result_text(title, character, choice, outcome, story, changes, check=N
     for key, value in changes.items():
         if abs(value) <= 1e-9:
             continue
-        suffix = " п.п." if key in ("food", "morale", "visibility") else unit(key)
+        suffix = "%" if key in ("food", "morale", "visibility") else unit(key)
         sign = "+" if value > 0 else "−"
         current = f" ({n(camp[key])}{unit(key)})" if camp is not None else ""
         effects.append(f"{RESOURCE_ICONS[key]} {RESOURCES[key]}: {sign}{n(abs(value))}{suffix}{current}")
@@ -91,7 +91,7 @@ def camp_change_text(description, before, after, title="📜 Новое собы
         if abs(value) <= 1e-9:
             continue
         sign = "+" if value > 0 else "−"
-        suffix = " п.п." if key in ("food", "morale", "visibility") else unit(key)
+        suffix = "%" if key in ("food", "morale", "visibility") else unit(key)
         lines.append(f"{RESOURCE_ICONS[key]} {label}: {sign}{n(abs(value))}{suffix} ({n(after[key])}{unit(key)})")
     return styled(f"{title}\n{DIVIDER}\n{description}\n\n📦 Изменения в лагере\n"
             + ("\n".join(lines) or "Без изменения ресурсов."))
@@ -173,7 +173,7 @@ def action_text(c):
 def camp_text(state, rules):
     c = state["camp"]
     daily = expenses(c, rules)
-    costs = "\n".join(f"{RESOURCE_ICONS[k]} {RESOURCES[k]}: {n(v/7)}{' п.п.' if k == 'food' else ' зм' if k == 'gold' else ''}" for k, v in daily.items())
+    costs = "\n".join(f"{RESOURCE_ICONS[k]} {RESOURCES[k]}: {n(v/7)}{'%' if k == 'food' else ' зм' if k == 'gold' else ''}" for k, v in daily.items())
     return styled(f"🏕️ Лагерь\n📍 Расположение: {c['location']}\n👥 Жителей: {c['residents']}\n"
             f"Одобренных персонажей: {len(active_characters(state))}\n"
             f"Безымянных жителей: {c.get('extra_residents', max(0, c['residents']-len(active_characters(state))))}\n"
@@ -186,7 +186,7 @@ def camp_text(state, rules):
 def session_text(result, state):
     c = state["camp"]
     text = (f"🎲 Начало сессии\n⏳ Прошло игровых дней: {result['days']}\n📅 Сейчас день: {result['day']}\n{DIVIDER}\n"
-            + "⚒️ Собрано за период\n" + "\n".join(f"{RESOURCE_ICONS[k]} {RESOURCES[k]}: {n(v)}{' п.п.' if k == 'food' else unit(k)}"
+            + "⚒️ Собрано за период\n" + "\n".join(f"{RESOURCE_ICONS[k]} {RESOURCES[k]}: {n(v)}{'%' if k == 'food' else unit(k)}"
                                                      for k, v in result["collected"].items())
             + "\n\n🏕️ Состояние лагеря\n" + balances(c))
     text += "\n\n🎁 Предметы\n" + ("\n".join("• " + item for item in result["items"]) if result["items"] else result["item_note"])

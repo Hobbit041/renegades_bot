@@ -239,7 +239,7 @@ async def test_spend_and_meal_are_confirmed_once(app):
     reports = [o for o in state["outbox"] if o["target"] == "camp"]
     assert len(reports) == 2
     assert "🧪 Компоненты: −3.6 (33.4)" in reports[-1]["text"]
-    assert "🔥 Мораль: +2 п.п. (57%)" in reports[-1]["text"]
+    assert "🔥 Мораль: +2% (57%)" in reports[-1]["text"]
 
 
 async def test_concurrent_delivery_does_not_send_twice(app):
