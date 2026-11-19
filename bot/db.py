@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from bot.domain import initial_state
+from bot.domain import initial_state, sync_population
 
 
 class Store:
@@ -25,6 +25,8 @@ class Store:
             await conn.execute(text("CREATE TABLE IF NOT EXISTS campaign (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL)"))
             await conn.execute(text("INSERT OR IGNORE INTO campaign(id,value) VALUES(1,:v)"),
                                {"v": json.dumps(initial_state(rules), ensure_ascii=False)})
+        async with self.transaction():
+            pass
 
     @asynccontextmanager
     async def transaction(self):
@@ -32,7 +34,9 @@ class Store:
             await conn.execute(text("BEGIN IMMEDIATE"))
             try:
                 state = json.loads((await conn.execute(text("SELECT value FROM campaign WHERE id=1"))).scalar_one())
+                sync_population(state)
                 yield state
+                sync_population(state)
                 await conn.execute(text("UPDATE campaign SET value=:v WHERE id=1"), {"v": json.dumps(state, ensure_ascii=False, allow_nan=False)})
                 await conn.commit()
             except BaseException:

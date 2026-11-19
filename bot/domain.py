@@ -96,7 +96,9 @@ def initial_state(rules):
                                     "modifier": {"low": 5, "medium": 10, "high": 15}[amount]}
         chars[c["id"]] = c
     return {"schema": 1, "camp": {**copy.deepcopy(rules["initial"]),
-            "residents": rules["residents"], "horses": rules["horses"], "location": "Не указано",
+            "residents": max(rules["residents"], len(chars)),
+            "extra_residents": max(0, rules["residents"] - len(chars)),
+            "horses": rules["horses"], "location": "Не указано",
             "policies": dict.fromkeys(("food", "components", "materials"), "moderate"),
             "lifestyle": "simple", "day": 0, "buildings": [], "cycle_due": None},
             "characters": chars, "users": {}, "contributions": [], "sessions": [],
@@ -106,6 +108,18 @@ def initial_state(rules):
 def active_characters(state):
     return [c for c in state["characters"].values()
             if c["approved"]]
+
+
+def sync_population(state):
+    camp = state["camp"]
+    named = len(active_characters(state))
+    # Old saves store a total, so preserve only its unrepresented residents.
+    camp.setdefault("extra_residents", max(0, camp["residents"] - named))
+    total = named + camp["extra_residents"]
+    if total != camp["residents"]:
+        camp["residents"] = total
+        state["revision"] += 1
+    camp["visibility"] = max(min(100, total), camp["visibility"])
 
 
 def allocations(character):

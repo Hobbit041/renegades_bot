@@ -372,10 +372,18 @@ def make_router(app):
         elif data in ("population", "move", "manual_check"):
             data = "check" if data == "manual_check" else data
             await dialog(uid, {"kind": data})
-            prompt = {"population": "Введите «жители лошади», например 20 2. Игроки уже входят в число жителей.",
+            prompt = {"population": "Введите «дополнительные безымянные жители лошади», например 7 2. Одобренные персонажи игроков и НПС добавляются автоматически, включая отдыхающих.",
                       "move": "Введите новое расположение. Это переезд: стационарные здания разбираются с возвратом 40% вложенных материалов. Переносные сохраняются.",
                       "check": "Укажите результат активной проверки: «ресурс | изменение | описание». Ресурсы: gold, food, components, materials, morale, visibility. Пример: components | -5 | Создание предмета. Списание выполняется после подтверждения.\nОбычный ингредиент: 0,1 компонента; особый: 1. Цена компонента и материала задаётся в JSON."}
-            await message.answer(prompt[data])
+            if data == "population":
+                state = await app.store.snapshot()
+                camp = state["camp"]
+                current = (f"👥 Всего жителей: {camp['residents']}\n"
+                           f"Одобренных персонажей: {len(active_characters(state))}\n"
+                           f"Безымянных жителей: {camp['extra_residents']}\n🐎 Лошадей: {camp['horses']}\n\n")
+                await message.answer(current + prompt[data])
+            else:
+                await message.answer(prompt[data])
         elif data.startswith("checkrun:"):
             operation = data.split(":")[1]
             async with app.store.transaction() as state:
@@ -541,13 +549,14 @@ def make_router(app):
                         reply = f"Рассчитать {days} игровых дней и начать сессию?\n\n{roster}\n\nНазначения фиксируются при подтверждении."
                         markup = inline([("Начать сессию", "run:" + operation)], [("Отмена", "home")])
                     elif kind == "population":
-                        residents, horses = map(int, text.split())
-                        if not 1 <= residents <= 100 or not 0 <= horses <= 100:
-                            raise ValueError("Жители: 1–100, лошади: 0–100")
-                        state["camp"].update(residents=residents, horses=horses)
-                        state["camp"]["visibility"] = max(state["camp"]["visibility"], residents)
+                        extra_residents, horses = map(int, text.split())
+                        if not 0 <= extra_residents <= 100 or not 0 <= horses <= 100:
+                            raise ValueError("Дополнительные жители: 0–100, лошади: 0–100")
+                        residents = len(active_characters(state)) + extra_residents
+                        state["camp"].update(extra_residents=extra_residents, residents=residents, horses=horses)
+                        state["camp"]["visibility"] = max(state["camp"]["visibility"], min(100, residents))
                         state["revision"] += 1
-                        reply = "Численность изменена."
+                        reply = f"👥 Всего жителей: {residents}\nИз них безымянных: {extra_residents}\n🐎 Лошадей: {horses}"
                     elif kind == "move":
                         if not 1 <= len(text) <= 200:
                             raise ValueError("Расположение: 1–200 символов")

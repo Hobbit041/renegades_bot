@@ -42,3 +42,41 @@ async def test_atomic_rollback_and_concurrent_updates(tmp_path, rules):
     await asyncio.gather(*(increase() for _ in range(20)))
     assert (await store.snapshot())["camp"]["gold"] == 1268
     await store.close()
+
+
+async def test_population_tracks_approved_characters_and_extra_residents(tmp_path, rules):
+    store = Store(tmp_path / "population.sqlite3")
+    await store.init(rules)
+    original = await store.snapshot()
+    async with store.transaction() as state:
+        first = add_worker(state, "hunt", owner=10)
+        second = add_worker(state, "gold", owner=10)
+        pending = create_character(state, 11, "Ожидает", [])
+    current = await store.snapshot()
+    assert current["camp"]["residents"] == original["camp"]["residents"] + 2
+    async with store.transaction() as state:
+        state["characters"][pending["id"]]["approved"] = True
+        state["camp"]["extra_residents"] = 7
+    current = await store.snapshot()
+    assert current["camp"]["residents"] == len([c for c in current["characters"].values() if c["approved"]]) + 7
+    await store.close()
+    store = Store(tmp_path / "population.sqlite3")
+    await store.init(rules)
+    assert (await store.snapshot())["camp"] == current["camp"]
+    await store.close()
+
+
+@pytest.mark.parametrize("old_total", [7, 20])
+def test_population_migrates_legacy_total_once(state, old_total):
+    from bot.domain import active_characters, sync_population
+    state["camp"].pop("extra_residents", None)
+    state["camp"]["residents"] = old_total
+    for _ in range(10):
+        add_worker(state, "hunt")
+    named = len(active_characters(state))
+    sync_population(state)
+    assert state["camp"]["extra_residents"] == max(0, old_total-named)
+    assert state["camp"]["residents"] == max(old_total, named)
+    add_worker(state, "hunt")
+    sync_population(state)
+    assert state["camp"]["residents"] == max(old_total, named)+1

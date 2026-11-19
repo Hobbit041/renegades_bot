@@ -174,7 +174,10 @@ def camp_text(state, rules):
     c = state["camp"]
     daily = expenses(c, rules)
     costs = "\n".join(f"{RESOURCE_ICONS[k]} {RESOURCES[k]}: {n(v/7)}{' п.п.' if k == 'food' else ' зм' if k == 'gold' else ''}" for k, v in daily.items())
-    return styled(f"🏕️ Лагерь\n📍 Расположение: {c['location']}\n👥 Жителей: {c['residents']}\n🐎 Лошадей: {c['horses']}\n📅 Игровой день: {c['day']}\n"
+    return styled(f"🏕️ Лагерь\n📍 Расположение: {c['location']}\n👥 Жителей: {c['residents']}\n"
+            f"Одобренных персонажей: {len(active_characters(state))}\n"
+            f"Безымянных жителей: {c.get('extra_residents', max(0, c['residents']-len(active_characters(state))))}\n"
+            f"🐎 Лошадей: {c['horses']}\n📅 Игровой день: {c['day']}\n"
             f"🛏️ Уровень жизни: {rules['lifestyles'][c['lifestyle']]['label']}\n{DIVIDER}\n📦 Запасы и состояние\n"
             + balances(c) + f"\n\n📉 Суточный расход\n{costs}"
             + f"\n\n👁️ Неснижаемая заметность: {min(100, c['residents'])}%")
