@@ -32,7 +32,7 @@ def styled(text):
         start = None
         if clean.startswith(headings) or clean.startswith("👤 ") and ": " not in clean:
             start = 0
-        elif clean.startswith(tuple(RESOURCE_ICONS.values()) + ("👤", "🎯", "✅", "❌", "💥", "📍", "👥", "📅", "🛏️", "⏳")) and ": " in clean:
+        elif clean.startswith(tuple(RESOURCE_ICONS.values()) + ("👤", "🎯", "✅", "❌", "💥", "📍", "👥", "🐎", "📅", "🛏️", "⏳")) and ": " in clean:
             start = clean.index(": ") + 2
         if start is not None and clean[start:]:
             entities.append(MessageEntity(type="bold", offset=offset + len(clean[:start].encode("utf-16-le"))//2,
@@ -174,7 +174,7 @@ def camp_text(state, rules):
     c = state["camp"]
     daily = expenses(c, rules)
     costs = "\n".join(f"{RESOURCE_ICONS[k]} {RESOURCES[k]}: {n(v/7)}{' п.п.' if k == 'food' else ' зм' if k == 'gold' else ''}" for k, v in daily.items())
-    return styled(f"🏕️ Лагерь\n📍 Расположение: {c['location']}\n👥 Жителей: {c['residents']}\n📅 Игровой день: {c['day']}\n"
+    return styled(f"🏕️ Лагерь\n📍 Расположение: {c['location']}\n👥 Жителей: {c['residents']}\n🐎 Лошадей: {c['horses']}\n📅 Игровой день: {c['day']}\n"
             f"🛏️ Уровень жизни: {rules['lifestyles'][c['lifestyle']]['label']}\n{DIVIDER}\n📦 Запасы и состояние\n"
             + balances(c) + f"\n\n📉 Суточный расход\n{costs}"
             + f"\n\n👁️ Неснижаемая заметность: {min(100, c['residents'])}%")
