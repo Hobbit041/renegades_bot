@@ -3,7 +3,7 @@ import random
 
 import pytest
 
-from bot.domain import advance, efficiency, item_drop, validate_rules
+from bot.domain import advance, efficiency, item_drop, production_tier, validate_rules
 from conftest import add_worker
 
 
@@ -61,11 +61,13 @@ def test_chunk_invariance_and_hidden_cycles(state, rules):
     a, b = copy.deepcopy(state), copy.deepcopy(state)
     ra, rb = random.Random(20), random.Random(20)
     result = advance(a, 21, rules, ra)
+    last_items = []
     for _ in range(21):
         last = advance(b, 1, rules, rb)
+        if last["items"]:
+            last_items = last["items"]
     assert a["camp"] == b["camp"]
-    assert result["items"] == last["items"]
-    assert result["item_note"] == last["item_note"]
+    assert result["items"] == last_items
     assert a["contributions"] == b["contributions"]
 
 
@@ -79,18 +81,53 @@ def test_visibility_floor_and_material_building_cost(state, rules):
     assert before - state["camp"]["materials"] == pytest.approx((23*2.5+7)/7)
 
 
-@pytest.mark.parametrize("components,count,third", [(29.99,0,0),(30,1,0),(49.99,1,0),(50,2,0),(70,3,1),(90,4,2),(100,4,2)])
-def test_drop_thresholds(rules, components, count, third):
+@pytest.mark.parametrize("components,days,count", [
+    (0,28,1), (29.99,28,1), (30,14,1), (49.99,14,1),
+    (50,10.5,1), (69.99,10.5,1), (70,7,1), (89.99,7,1), (90,7,2), (100,7,2),
+])
+def test_production_tiers_and_level_one_items(rules, components, days, count):
+    assert production_tier(components, rules)["days"] == days
     drops, _ = item_drop(components, rules, random.Random(3))
-    levels = [next(x["level"] for x in rules["items"] if x["name"] == name) for name in drops]
-    assert len(levels) == count
-    assert levels.count(3) == third
-    assert levels.count(2) <= 1
+    assert len(drops) == count
+    assert all(any(x["name"] == name and x["level"] == 1 for x in rules["items"]) for name in drops)
 
 
-def test_level_two_substitution_is_not_price_weighted(rules):
-    found = set()
-    for seed in range(100):
-        drops, _ = item_drop(100, rules, random.Random(seed))
-        found.add(any(x["level"] == 2 and x["name"] in drops for x in rules["items"]))
-    assert found == {True, False}
+@pytest.mark.parametrize("components,ready_day,count", [(100,7,2),(80,7,1),(60,11,1),(40,14,1),(0,28,1)])
+def test_production_waits_and_keeps_progress(state, rules, components, ready_day, count):
+    rules["weekly"]["components"] = 0
+    state["camp"]["policies"]["components"] = "none"
+    state["camp"]["components"] = components
+    assert not advance(state, ready_day-1, rules)["items"]
+    result = advance(state, 1, rules)
+    assert len(result["items"]) == count
+    assert state["camp"]["components"] == components
+
+
+def test_speed_changes_keep_work_and_report_latest_batch(state, rules):
+    rules["weekly"]["components"] = 0
+    state["camp"]["policies"]["components"] = "none"
+    state["camp"]["components"] = 40
+    advance(state, 7, rules)
+    assert state["camp"]["production_progress"] == pytest.approx(.5)
+    state["camp"]["components"] = 100
+    result = advance(state, 5, rules)
+    assert len(result["items"]) == 2  # Finished on day 11, still reported on day 12.
+    assert state["camp"]["production_progress"] == pytest.approx(3/14)
+    assert not advance(state, 1, rules)["items"]  # The previous batch is not issued twice.
+
+
+def test_legacy_cycle_starts_new_progress_without_changing_resources(state, rules):
+    state["camp"].pop("production_progress", None)
+    state["camp"].update(cycle_due=999, components=100)
+    rules["weekly"]["components"] = 0
+    state["camp"]["policies"]["components"] = "none"
+    assert len(advance(state, 7, rules)["items"]) == 2
+    assert "cycle_due" not in state["camp"]
+    assert state["camp"]["components"] == 100
+
+
+def test_old_balance_json_uses_new_production_defaults(state, rules):
+    rules["production"] = {"ready_probabilities": [.1]+[.15]*6, "level2_chance": .5}
+    validate_rules(rules)
+    assert production_tier(100, rules)["quantity"] == 2
+    assert len(item_drop(100, rules, random.Random(1))[0]) == 2

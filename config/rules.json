@@ -23,7 +23,16 @@
   "ingredient_basic": 0.1,
   "ingredient_special": 1,
   "meal_morale": 2,
-  "production": {"ready_probabilities": [0.10, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15], "level2_chance": 0.5},
+  "production": {
+    "item_level": 1,
+    "tiers": [
+      {"minimum": 0, "days": 28, "quantity": 1},
+      {"minimum": 30, "days": 14, "quantity": 1},
+      {"minimum": 50, "days": 10.5, "quantity": 1},
+      {"minimum": 70, "days": 7, "quantity": 1},
+      {"minimum": 90, "days": 7, "quantity": 2}
+    ]
+  },
   "items": [
     {"name": "Vaccine (minor)", "level": 1, "gold": 4},
     {"name": "Antiplague (lesser)", "level": 1, "gold": 3},

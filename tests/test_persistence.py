@@ -80,3 +80,24 @@ def test_population_migrates_legacy_total_once(state, old_total):
     add_worker(state, "hunt")
     sync_population(state)
     assert state["camp"]["residents"] == max(old_total, named)+1
+
+
+async def test_production_progress_survives_sessions_and_restart(tmp_path, rules):
+    from bot.service import start_session
+    rules["weekly"]["components"] = 0
+    path = tmp_path / "production.sqlite3"
+    store = Store(path)
+    await store.init(rules)
+    async with store.transaction() as state:
+        state["camp"]["components"] = 100
+        state["camp"]["policies"]["components"] = "none"
+        result = start_session(state, 1, "three-days", 3, rules)
+        assert not result["items"]
+    await store.close()
+    store = Store(path)
+    await store.init(rules)
+    async with store.transaction() as state:
+        assert state["camp"]["production_progress"] == pytest.approx(3/7)
+        result = start_session(state, 1, "four-days", 4, rules)
+        assert len(result["items"]) == 2
+    await store.close()

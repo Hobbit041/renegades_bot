@@ -61,16 +61,21 @@ def validate_rules(r):
     for x, y in knots:
         finite(x, -100, 1000)
         finite(y, 0, 1)
-    if not math.isclose(sum(r["production"]["ready_probabilities"]), 1):
-        raise ValueError("Вероятности готовности должны давать 100%")
-    if len(r["production"]["ready_probabilities"]) != 7:
-        raise ValueError("Производственный цикл: 7 дней")
-    for value in r["production"]["ready_probabilities"]:
-        finite(value, 0, 1)
-    for level in (1, 2, 3):
-        if not any(x["level"] == level for x in r["items"]):
-            raise ValueError(f"Пустой каталог предметов уровня {level}")
-    finite(r["production"]["level2_chance"], 0, 1)
+    tiers = r["production"].get("tiers", PRODUCTION_TIERS)
+    if not tiers or tiers[0]["minimum"] != 0:
+        raise ValueError("Шкала производства должна начинаться с 0% компонентов")
+    previous = -1
+    for tier in tiers:
+        minimum = finite(tier["minimum"], 0, 100)
+        if minimum <= previous:
+            raise ValueError("Пороги производства должны возрастать")
+        previous = minimum
+        finite(tier["days"], 1, 365)
+        if not isinstance(tier["quantity"], int) or not 1 <= tier["quantity"] <= 100:
+            raise ValueError("Количество предметов должно быть целым от 1 до 100")
+    level = r["production"].get("item_level", 1)
+    if not any(x["level"] == level for x in r["items"]):
+        raise ValueError(f"Пустой каталог предметов уровня {level}")
     finite(r["ingredient_basic"], 0, 10000)
     finite(r["ingredient_special"], 0, 10000)
     finite(r["meal_morale"], 0, 100)
@@ -100,7 +105,7 @@ def initial_state(rules):
             "extra_residents": max(0, rules["residents"] - len(chars)),
             "horses": rules["horses"], "location": "Не указано",
             "policies": dict.fromkeys(("food", "components", "materials"), "moderate"),
-            "lifestyle": "simple", "day": 0, "buildings": [], "cycle_due": None},
+            "lifestyle": "simple", "day": 0, "buildings": [], "production_progress": 0},
             "characters": chars, "users": {}, "contributions": [], "sessions": [],
             "events": [], "outbox": [], "operations": {}, "revision": 0}
 
@@ -155,21 +160,25 @@ def expenses(camp, rules):
             "materials": w["materials"] * scale + sum(b["upkeep"] for b in camp["buildings"])}
 
 
-def next_ready(day, rules, rng):
-    return day + rng.choices(range(1, 8), weights=rules["production"]["ready_probabilities"], k=1)[0]
+PRODUCTION_TIERS = [
+    {"minimum": 0, "days": 28, "quantity": 1},
+    {"minimum": 30, "days": 14, "quantity": 1},
+    {"minimum": 50, "days": 10.5, "quantity": 1},
+    {"minimum": 70, "days": 7, "quantity": 1},
+    {"minimum": 90, "days": 7, "quantity": 2},
+]
+
+
+def production_tier(components, rules):
+    tiers = rules["production"].get("tiers", PRODUCTION_TIERS)
+    return next(tier for tier in reversed(tiers) if components >= tier["minimum"])
 
 
 def item_drop(components, rules, rng):
-    if components < 30:
-        return [], "В лагере слишком мало компонентов! Предмет не произведён"
-    levels = [1] if components < 50 else [1, 1]
-    if components >= 70:
-        levels += [3]
-    if components >= 90:
-        levels += [3]
-    if components >= 50 and rng.random() < rules["production"]["level2_chance"]:
-        levels[0] = 2
-    return [rng.choice([x for x in rules["items"] if x["level"] == level])["name"] for level in levels], ""
+    level = rules["production"].get("item_level", 1)
+    catalog = [x for x in rules["items"] if x["level"] == level]
+    quantity = production_tier(components, rules)["quantity"]
+    return [rng.choice(catalog)["name"] for _ in range(quantity)], ""
 
 
 def advance(state, days, rules, rng=None):
@@ -183,9 +192,9 @@ def advance(state, days, rules, rng=None):
     before = {k: camp[k] for k in RESOURCES}
     collected = dict.fromkeys(("gold", "food", "components", "materials"), 0.0)
     last_items, last_note = [], "Тельга ещё не успела подготовить предметы"
-    if camp["cycle_due"] is None:
-        camp["cycle_due"] = next_ready(camp["day"], rules, rng)
-    for offset in range(days):
+    camp.setdefault("production_progress", 0)
+    camp.pop("cycle_due", None)
+    for _ in range(days):
         camp["day"] += 1
         earned = rates["gold"] / 7
         camp["gold"] += earned
@@ -225,12 +234,12 @@ def advance(state, days, rules, rng=None):
                         "visibility": amounts.get("hide", 0) / 7}
             if any(credited.values()):
                 state["contributions"].append({"day": camp["day"], "character": cid, "values": credited})
-        if camp["day"] == camp["cycle_due"]:
-            # Complete EVERY cycle, but only expose items finished on the final day.
-            drops, note = item_drop(camp["components"], rules, rng)
-            camp["cycle_due"] = next_ready(camp["day"], rules, rng)
-            if offset == days - 1:
-                last_items, last_note = drops, note
+        tier = production_tier(camp["components"], rules)
+        camp["production_progress"] += 1 / tier["days"]
+        if camp["production_progress"] >= 1 - 1e-9:
+            camp["production_progress"] = max(0, camp["production_progress"] - 1)
+            # Only the latest completed batch in this period remains for the players.
+            last_items, last_note = item_drop(camp["components"], rules, rng)
     return {"days": days, "day": camp["day"], "before": before,
             "after": {k: camp[k] for k in RESOURCES}, "collected": collected,
             "items": last_items, "item_note": last_note}
