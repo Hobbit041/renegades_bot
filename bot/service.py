@@ -165,7 +165,7 @@ def draw_events(state, catalog, local_date, rng=None, rules=None, now=None):
         if not character or not character["approved"] or character["owner"] != int(uid):
             continue
         u["last_event_date"] = local_date
-        if rng.random() < .5:
+        if rng.random() < .4:
             event = rng.choice(catalog)
             entry, markup = issue_event(state, int(uid), character, event, time.time() if now is None else now, rules)
             enqueue(state, int(uid), offer_text(entry),
