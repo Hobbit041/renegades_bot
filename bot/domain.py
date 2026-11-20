@@ -70,9 +70,11 @@ def validate_rules(r):
         if minimum <= previous:
             raise ValueError("Пороги производства должны возрастать")
         previous = minimum
-        finite(tier["days"], 1, 365)
-        if not isinstance(tier["quantity"], int) or not 1 <= tier["quantity"] <= 100:
-            raise ValueError("Количество предметов должно быть целым от 1 до 100")
+        finite(tier["days"], 0, 365)
+        if not isinstance(tier["quantity"], int) or not 0 <= tier["quantity"] <= 100:
+            raise ValueError("Количество предметов должно быть целым от 0 до 100")
+        if bool(tier["days"]) != bool(tier["quantity"]) or 0 < tier["days"] < 1:
+            raise ValueError("Для паузы срок и количество равны 0; для производства срок не меньше дня")
     level = r["production"].get("item_level", 1)
     if not any(x["level"] == level for x in r["items"]):
         raise ValueError(f"Пустой каталог предметов уровня {level}")
@@ -162,7 +164,7 @@ def expenses(camp, rules):
 
 
 PRODUCTION_TIERS = [
-    {"minimum": 0, "days": 28, "quantity": 1},
+    {"minimum": 0, "days": 0, "quantity": 0},
     {"minimum": 30, "days": 14, "quantity": 1},
     {"minimum": 50, "days": 10.5, "quantity": 1},
     {"minimum": 70, "days": 7, "quantity": 1},
@@ -171,6 +173,8 @@ PRODUCTION_TIERS = [
 
 
 def production_tier(components, rules):
+    if components <= 30:
+        return PRODUCTION_TIERS[0]
     tiers = rules["production"].get("tiers", PRODUCTION_TIERS)
     return next(tier for tier in reversed(tiers) if components >= tier["minimum"])
 
@@ -236,6 +240,13 @@ def advance(state, days, rules, rng=None):
             if any(credited.values()):
                 state["contributions"].append({"day": camp["day"], "character": cid, "values": credited})
         tier = production_tier(camp["components"], rules)
+        if not tier["quantity"]:
+            if not last_items:
+                last_note = ("Всё производство остановлено" if camp["components"] <= 10
+                             else "Тельга не производит предметы")
+            continue
+        if not last_items:
+            last_note = "Тельга ещё не успела подготовить предметы"
         camp["production_progress"] += 1 / tier["days"]
         if camp["production_progress"] >= 1 - 1e-9:
             camp["production_progress"] = max(0, camp["production_progress"] - 1)

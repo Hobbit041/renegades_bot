@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bot.domain import ACTIONS, RESOURCES, RANKS, active_characters, allocations, expenses, production_tier
+from bot.domain import ACTIONS, RESOURCES, RANKS, active_characters, allocations, expenses
 from aiogram.types import MessageEntity
 
 DIVIDER = "━━━━━━━━━━━━━━━"
@@ -130,10 +130,15 @@ def balances(camp, rules=None):
             hints["food"] = "Пайки всегда доступны"
         else:
             hints["food"] = "Нет бонусов"
-        tier = production_tier(camp["components"], rules)
-        quantity = tier["quantity"]
-        item = "предмет" if quantity == 1 else "предмета"
-        hints["components"] = f"{n(tier['days'])} дней на {quantity} {item}"
+        components = camp["components"]
+        if components <= 10:
+            hints["components"] = "Всё производство остановлено"
+        elif components <= 30:
+            hints["components"] = "Тельга не производит предметы"
+        elif components < 70:
+            hints["components"] = "Нет бонусов"
+        else:
+            hints["components"] = "К лечению добавляется значение уровня"
         morale = camp["morale"]
         if morale < 10:
             hints["morale"] = "Макс. ХП снижено, макс. 1 очко героизма"
@@ -151,10 +156,10 @@ def balances(camp, rules=None):
             text += "\n"
         prefix = f"{RESOURCE_ICONS[key]} {RESOURCES[key]}: "
         if rules is not None and key in ("food", "components", "morale"):
-            percent = round(max(0, min(100, camp[key])))
-            filled = percent // 10
+            percent = max(0, min(100, camp[key]))
+            filled = int(percent // 10)
             bar = "█" * filled + "░" * (10-filled)
-            text += prefix + RichText(bar, [MessageEntity(type="code", offset=0, length=10)]) + f" {percent}%"
+            text += prefix + RichText(bar, [MessageEntity(type="code", offset=0, length=10)]) + f" {n(percent)}%"
         else:
             text += styled(prefix + f"{n(camp[key])}{unit(key)}")
         if key in hints:

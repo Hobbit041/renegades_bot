@@ -98,6 +98,16 @@ async def test_production_progress_survives_sessions_and_restart(tmp_path, rules
     await store.init(rules)
     async with store.transaction() as state:
         assert state["camp"]["production_progress"] == pytest.approx(3/7)
+        state["camp"]["components"] = 20
+        result = start_session(state, 1, "paused", 28, rules)
+        assert not result["items"]
+        assert state["camp"]["production_progress"] == pytest.approx(3/7)
+    await store.close()
+    store = Store(path)
+    await store.init(rules)
+    async with store.transaction() as state:
+        assert state["camp"]["production_progress"] == pytest.approx(3/7)
+        state["camp"]["components"] = 100
         result = start_session(state, 1, "four-days", 4, rules)
         assert len(result["items"]) == 2
     await store.close()

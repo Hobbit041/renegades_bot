@@ -26,7 +26,7 @@
   "production": {
     "item_level": 1,
     "tiers": [
-      {"minimum": 0, "days": 28, "quantity": 1},
+      {"minimum": 0, "days": 0, "quantity": 0},
       {"minimum": 30, "days": 14, "quantity": 1},
       {"minimum": 50, "days": 10.5, "quantity": 1},
       {"minimum": 70, "days": 7, "quantity": 1},

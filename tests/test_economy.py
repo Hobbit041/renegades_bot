@@ -125,7 +125,7 @@ def test_visibility_floor_and_material_building_cost(state, rules):
 
 
 @pytest.mark.parametrize("components,days,count", [
-    (0,28,1), (29.99,28,1), (30,14,1), (49.99,14,1),
+    (0,0,0), (10,0,0), (10.01,0,0), (29.99,0,0), (30,0,0), (30.01,14,1), (49.99,14,1),
     (50,10.5,1), (69.99,10.5,1), (70,7,1), (89.99,7,1), (90,7,2), (100,7,2),
 ])
 def test_production_tiers_and_level_one_items(rules, components, days, count):
@@ -135,7 +135,7 @@ def test_production_tiers_and_level_one_items(rules, components, days, count):
     assert all(any(x["name"] == name and x["level"] == 1 for x in rules["items"]) for name in drops)
 
 
-@pytest.mark.parametrize("components,ready_day,count", [(100,7,2),(80,7,1),(60,11,1),(40,14,1),(0,28,1)])
+@pytest.mark.parametrize("components,ready_day,count", [(100,7,2),(80,7,1),(60,11,1),(40,14,1)])
 def test_production_waits_and_keeps_progress(state, rules, components, ready_day, count):
     rules["weekly"]["components"] = 0
     state["camp"]["policies"]["components"] = "none"
@@ -157,6 +157,22 @@ def test_speed_changes_keep_work_and_report_latest_batch(state, rules):
     assert len(result["items"]) == 2  # Finished on day 11, still reported on day 12.
     assert state["camp"]["production_progress"] == pytest.approx(3/14)
     assert not advance(state, 1, rules)["items"]  # The previous batch is not issued twice.
+
+
+@pytest.mark.parametrize("components,note", [(0,"Всё производство остановлено"),(10,"Всё производство остановлено"),(10.01,"Тельга не производит предметы"),(30,"Тельга не производит предметы")])
+def test_low_components_pause_and_resume_the_same_batch(state, rules, components, note):
+    rules["weekly"]["components"] = 0
+    state["camp"]["policies"]["components"] = "none"
+    state["camp"]["components"] = 40
+    advance(state, 7, rules)
+    progress = state["camp"]["production_progress"]
+    state["camp"]["components"] = components
+    result = advance(state, 28, rules)
+    assert not result["items"]
+    assert result["item_note"] == note
+    assert state["camp"]["production_progress"] == progress
+    state["camp"]["components"] = 40
+    assert len(advance(state, 7, rules)["items"]) == 1
 
 
 def test_legacy_cycle_starts_new_progress_without_changing_resources(state, rules):

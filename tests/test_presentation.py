@@ -17,7 +17,7 @@ def test_camp_resource_explanations_are_outside_bold(state, rules, food, label):
     state["camp"].update(food=food, components=100)
     text = camp_text(state, rules)
     assert label in text
-    assert "Компоненты: ██████████ 100%\n(7 дней на 2 предмета)" in text
+    assert "Компоненты: ██████████ 100%\n(К лечению добавляется значение уровня)" in text
     assert "Материалы: 30 ед." in text
     raw = text.encode("utf-16-le")
     bold = [raw[e.offset*2:(e.offset+e.length)*2].decode("utf-16-le") for e in text.entities]
@@ -33,6 +33,13 @@ def test_camp_shows_narrative_morale_effect(state, rules, morale, hint):
     text = camp_text(state, rules)
     assert hint in text
     assert "п.п." not in text
+
+
+@pytest.mark.parametrize("components,hint", [(0,"Всё производство остановлено"),(10,"Всё производство остановлено"),(10.01,"Тельга не производит предметы"),(30,"Тельга не производит предметы"),(30.01,"Нет бонусов"),(69.99,"Нет бонусов"),(70,"К лечению добавляется значение уровня"),(100,"К лечению добавляется значение уровня")])
+def test_component_state_captions(state, rules, components, hint):
+    from bot.presentation import camp_text
+    state["camp"]["components"] = components
+    assert f"\n({hint})" in camp_text(state, rules)
 
 
 def test_who_bold_entities_are_ordered_and_only_cover_activity_labels(state):
